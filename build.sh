@@ -27,29 +27,40 @@ if ! [ -z "${JENKINS_HOME}" ]; then
 fi
 
 usage() {
-# TODO: Update this
 cat <<EOF
-Usage: sh $0 command [argument]
+Usage: sh $0 command [argument] [settings]
 
 command:
-  download-core:        downloads core library (binary version)
   clean:                clean up/remove all generated files
-  build:            	builds iOS and OS X frameworks
-  ios-dynamic:     	builds iOS dynamic frameworks
-  ios-static:       	builds a fat iOS static framework
-  osx:              	builds OS X framework
-  test-ios:         	tests iOS framework
-  test-ios-devices: 	tests iOS on all attached iOS devices
-  test-osx:         	tests OSX framework
-  test:             	tests iOS and OS X frameworks
-  test-all:         	tests iOS and OS X frameworks with debug and release configurations
-  examples:         	builds all examples in examples/
-  browser:         	builds the Realm Browser OSX app
-  test-browser:     	tests the Realm Browser OSX app
-  verify:           	cleans, removes docs/output/, then runs docs, test-all, examples & browser
+  download-core:        downloads core library (binary version)
+  build:                builds all iOS  and OS X frameworks
+  ios-static:           builds fat iOS static framework
+  ios-dynamic:          builds iOS dynamic frameworks
+  ios-dynamic-fat:      builds fat iOS dynamic framework
+  ios-swift:            builds RealmSwift frameworks for iOS
+  ios-swift-fat:        builds fat RealmSwift framework for iOS
+  osx:                  builds OS X framework
+  osx-swift:            builds RealmSwift framework for OS X
+  test:                 tests all iOS and OS X frameworks
+  test-all:             tests all iOS and OS X frameworks in both Debug and Release configurations
+  test-ios-static:      tests static iOS framework on 32-bit and 64-bit simulators
+  test-ios-dynamic:     tests dynamic iOS framework on 32-bit and 64-bit simulators
+  test-ios-swift:       tests RealmSwift iOS framework on 32-bit and 64-bit simulators
+  test-ios-devices:     tests dynamic and Swift iOS frameworks on all attached iOS devices
+  test-osx:             tests OS X framework
+  test-osx-swift:       tests RealmSwift OS X framework
+  verify:               verifies docs, osx, osx-swift, ios-static, ios-dynamic, ios-swift, ios-device in both Debug and Release configurations
   docs:                 builds docs in docs/output
+  examples:             builds all examples
+  examples-ios:         builds all static iOS examples
+  examples-ios-swift:   builds all Swift iOS examples
+  examples-osx:         builds all OS X examples
+  browser:              builds the Realm Browser
+  test-browser:         tests the Realm Browser
   get-version:          get the current version
   set-version version:  set the version
+  cocoapods-setup:      download realm-core and create a stub RLMPlatform.h file to enable building via CocoaPods
+
 
 argument:
   version: version in the x.y.z format
@@ -380,7 +391,6 @@ case "$COMMAND" in
         sh build.sh verify-ios-swift
         sh build.sh verify-ios-swift-debug
         sh build.sh verify-ios-device
-        sh build.sh verify-docs
         ;;
 
     "verify-osx")
@@ -575,7 +585,8 @@ case "$COMMAND" in
 
     "package-ios-static")
         cd tightdb_objc
-        sh build.sh ios-static # TODO: Test built framework
+        sh build.sh test-ios-static
+        sh build.sh ios-static
 
         cd build/ios
         zip --symlinks -r realm-framework-ios.zip Realm.framework
