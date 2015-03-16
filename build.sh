@@ -28,7 +28,7 @@ fi
 
 usage() {
 cat <<EOF
-Usage: sh $0 command [argument] [settings]
+Usage: sh $0 command [argument]
 
 command:
   clean:                clean up/remove all generated files
@@ -64,7 +64,6 @@ command:
 
 argument:
   version: version in the x.y.z format
-  settings: additional arguments to pass to the build tool
 
 environment variables:
   XCMODE: xcodebuild (default), xcpretty or xctool
@@ -471,16 +470,24 @@ case "$COMMAND" in
             xc "-project examples/ios/objc/RealmExamples.xcodeproj -scheme Extension -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         fi
 
-        exit 0
-        ;;
-
-    "examples-ios-swift")
+        # Old swift api examples
         xc "-project examples/ios/swift/RealmExamples.xcodeproj -scheme Simple -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         xc "-project examples/ios/swift/RealmExamples.xcodeproj -scheme TableView -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         xc "-project examples/ios/swift/RealmExamples.xcodeproj -scheme Migration -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         xc "-project examples/ios/swift/RealmExamples.xcodeproj -scheme Encryption -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         xc "-project examples/ios/swift/RealmExamples.xcodeproj -scheme Backlink -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         xc "-project examples/ios/swift/RealmExamples.xcodeproj -scheme GroupedTableView -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
+
+        exit 0
+        ;;
+
+    "examples-ios-swift")
+        xc "-project examples/ios/swift-next/RealmExamples.xcodeproj -scheme Simple -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
+        xc "-project examples/ios/swift-next/RealmExamples.xcodeproj -scheme TableView -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
+        xc "-project examples/ios/swift-next/RealmExamples.xcodeproj -scheme Migration -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
+        xc "-project examples/ios/swift-next/RealmExamples.xcodeproj -scheme Encryption -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
+        xc "-project examples/ios/swift-next/RealmExamples.xcodeproj -scheme Backlink -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
+        xc "-project examples/ios/swift-next/RealmExamples.xcodeproj -scheme GroupedTableView -configuration $CONFIGURATION build ${CODESIGN_PARAMS}"
         exit 0
         ;;
 
@@ -569,6 +576,7 @@ case "$COMMAND" in
     "package-examples")
         cd tightdb_objc
         ./scripts/package_examples.rb
+        rm -rf examples/ios/swift-next # TODO: Remove this line once the new Swift APIs are released
         zip --symlinks -r realm-examples.zip examples
         ;;
 
@@ -631,6 +639,7 @@ case "$COMMAND" in
             cd ${WORKSPACE}/tightdb_objc
             cp -R plugin ${TEMPDIR}/realm-cocoa-${VERSION}
             cp LICENSE ${TEMPDIR}/realm-cocoa-${VERSION}/LICENSE.txt
+            cp Realm/Swift/RLMSupport.swift ${TEMPDIR}/realm-cocoa-${VERSION}/Swift/
             cp build.sh ${TEMPDIR}/realm-cocoa-${VERSION}/source/
             cp -R Realm ${TEMPDIR}/realm-cocoa-${VERSION}/source/
             cp -R RealmSwift ${TEMPDIR}/realm-cocoa-${VERSION}/source/
