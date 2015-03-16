@@ -27,6 +27,7 @@ if ! [ -z "${JENKINS_HOME}" ]; then
 fi
 
 usage() {
+# TODO: Update this
 cat <<EOF
 Usage: sh $0 command [argument]
 
@@ -103,7 +104,7 @@ build_combined() {
     local scope_suffix="$4"
 
     # Derive build paths
-    local build_products_path="build/DerivedData/Realm/Build/Products"
+    local build_products_path="build/DerivedData/$module_name/Build/Products"
     local product_name="$module_name.framework"
     local binary_path="$module_name"
     local iphoneos_path="$build_products_path/$config-iphoneos$scope_suffix/$product_name"
@@ -111,8 +112,13 @@ build_combined() {
     local out_path="build/ios"
 
     # Build for each platform
-    xcrealm "-scheme '$scheme' -configuration $config -sdk iphoneos"
-    xcrealm "-scheme '$scheme' -configuration $config -sdk iphonesimulator ONLY_ACTIVE_ARCH=NO"
+    if [[ "$module_name" == "Realm" ]]; then
+      xcrealm "-scheme '$scheme' -configuration $config -sdk iphoneos"
+      xcrealm "-scheme '$scheme' -configuration $config -sdk iphonesimulator ONLY_ACTIVE_ARCH=NO"
+    elif [[ "$module_name" == "RealmSwift" ]]; then
+      xcrealmswift "-scheme '$scheme' -configuration $config -sdk iphoneos"
+      xcrealmswift "-scheme '$scheme' -configuration $config -sdk iphonesimulator ONLY_ACTIVE_ARCH=NO"
+    fi
 
     # Combine .swiftmodule
     if [ -d $iphoneos_path/Modules/$module_name.swiftmodule ]; then
@@ -120,17 +126,10 @@ build_combined() {
     fi
 
     # Retrieve build products
-    local combined_out_path="$out_path"
-    if file $iphoneos_path/$binary_path | grep -q "dynamically linked"; then
-      combined_out_path="$out_path/simulator"
-      clean_retrieve $iphoneos_path        $out_path/iphone    $product_name
-      clean_retrieve $iphonesimulator_path $out_path/simulator $product_name
-    else
-      clean_retrieve $iphoneos_path        $out_path           $product_name
-    fi
+    clean_retrieve $iphoneos_path $out_path $product_name
 
     # Combine ar archives
-    xcrun lipo -create "$iphonesimulator_path/$binary_path" "$iphoneos_path/$binary_path" -output "$combined_out_path/$product_name/$module_name"
+    xcrun lipo -create "$iphonesimulator_path/$binary_path" "$iphoneos_path/$binary_path" -output "$out_path/$product_name/$module_name"
 }
 
 clean_retrieve() {
@@ -260,8 +259,8 @@ case "$COMMAND" in
     ######################################
     "build")
         sh build.sh ios-static
-        sh build.sh ios-dynamic
-        sh build.sh ios-swift
+        sh build.sh ios-dynamic-fat
+        sh build.sh ios-swift-fat
         sh build.sh osx
         sh build.sh osx-swift
         exit 0
@@ -278,9 +277,19 @@ case "$COMMAND" in
         exit 0
         ;;
 
+    "ios-dynamic-fat")
+        build_combined "iOS Dynamic" "$CONFIGURATION" Realm -dynamic
+        exit 0
+        ;;
+
     "ios-swift")
         xcrealmswift "-scheme 'RealmSwift iOS' -configuration $CONFIGURATION build -sdk iphoneos"
         xcrealmswift "-scheme 'RealmSwift iOS' -configuration $CONFIGURATION build -sdk iphonesimulator ONLY_ACTIVE_ARCH=NO"
+        exit 0
+        ;;
+
+    "ios-swift-fat")
+        build_combined "RealmSwift iOS" "$CONFIGURATION" RealmSwift
         exit 0
         ;;
 
@@ -550,7 +559,7 @@ case "$COMMAND" in
     "package-examples")
         cd tightdb_objc
         ./scripts/package_examples.rb
-        zip --symlinks -r realm-obj-examples.zip examples
+        zip --symlinks -r realm-examples.zip examples
         ;;
 
     "package-test-examples")
@@ -561,17 +570,15 @@ case "$COMMAND" in
         cd realm-cocoa-${VERSION}
         sh build.sh examples
         cd ..
-        rm -rf realm-cocoa-*
+        rm -rf realm-cocoa-${VERSION}
         ;;
 
-    "package-ios")
+    "package-ios-static")
         cd tightdb_objc
-        sh build.sh test-ios
-        sh build.sh examples
-        sh build.sh ios-dynamic
+        sh build.sh ios-static # TODO: Test built framework
 
         cd build/ios
-        zip --symlinks -r realm-framework-ios.zip Realm*
+        zip --symlinks -r realm-framework-ios.zip Realm.framework
         ;;
 
     "package-osx")
@@ -592,6 +599,7 @@ case "$COMMAND" in
         mkdir -p ${TEMPDIR}/realm-cocoa-${VERSION}/osx
         mkdir -p ${TEMPDIR}/realm-cocoa-${VERSION}/ios
         mkdir -p ${TEMPDIR}/realm-cocoa-${VERSION}/browser
+        mkdir -p ${TEMPDIR}/realm-cocoa-${VERSION}/source
 
         (
             cd ${TEMPDIR}/realm-cocoa-${VERSION}/osx
@@ -609,14 +617,20 @@ case "$COMMAND" in
         )
 
         (
-            cd ${TEMPDIR}/realm-cocoa-${VERSION}
-            unzip ${WORKSPACE}/realm-obj-examples.zip
+            cd ${WORKSPACE}/tightdb_objc
+            cp -R plugin ${TEMPDIR}/realm-cocoa-${VERSION}
+            cp LICENSE ${TEMPDIR}/realm-cocoa-${VERSION}/LICENSE.txt
+            cp build.sh ${TEMPDIR}/realm-cocoa-${VERSION}/source/
+            cp -R Realm ${TEMPDIR}/realm-cocoa-${VERSION}/source/
+            cp -R RealmSwift ${TEMPDIR}/realm-cocoa-${VERSION}/source/
+            cp -R Realm.xcodeproj ${TEMPDIR}/realm-cocoa-${VERSION}/source/
+            cp -R RealmSwift.xcodeproj ${TEMPDIR}/realm-cocoa-${VERSION}/source/
         )
 
-        cp -R ${WORKSPACE}/tightdb_objc/plugin ${TEMPDIR}/realm-cocoa-${VERSION}
-        cp ${WORKSPACE}/tightdb_objc/LICENSE ${TEMPDIR}/realm-cocoa-${VERSION}/LICENSE.txt
-        mkdir -p ${TEMPDIR}/realm-cocoa-${VERSION}/Swift
-        cp ${WORKSPACE}/tightdb_objc/Realm/Swift/RLMSupport.swift ${TEMPDIR}/realm-cocoa-${VERSION}/Swift/
+        (
+            cd ${TEMPDIR}/realm-cocoa-${VERSION}
+            unzip ${WORKSPACE}/realm-examples.zip
+        )
 
         cat > ${TEMPDIR}/realm-cocoa-${VERSION}/docs.webloc <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -653,8 +667,8 @@ EOF
         cd $WORKSPACE
         git clone $REALM_SOURCE tightdb_objc
 
-        echo 'Packaging iOS'
-        sh tightdb_objc/build.sh package-ios
+        echo 'Packaging iOS static'
+        sh tightdb_objc/build.sh package-ios-static
         cp tightdb_objc/build/ios/realm-framework-ios.zip .
 
         echo 'Packaging OS X'
@@ -671,7 +685,7 @@ EOF
         cd ../..
 
         sh tightdb_objc/build.sh package-examples
-        cp tightdb_objc/realm-obj-examples.zip .
+        cp tightdb_objc/realm-examples.zip .
 
         echo 'Packaging browser'
         sh tightdb_objc/build.sh package-browser
